@@ -34,6 +34,32 @@ export async function POST(req: Request) {
     }
   }
 
+  // Mark subscription paid/active on invoice.paid (best signal that money actually moved)
+  if (event.type === 'invoice.paid') {
+    const inv = event.data.object as Stripe.Invoice;
+    const subId = typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id;
+    const customerId = typeof inv.customer === 'string' ? inv.customer : inv.customer?.id;
+
+    if (subId && customerId) {
+      // Find tenant via stripe_customers
+      const { data: customerRow } = await sb
+        .from('stripe_customers')
+        .select('tenant_id')
+        .eq('stripe_customer_id', customerId)
+        .maybeSingle();
+
+      if (customerRow?.tenant_id) {
+        await sb.from('subscriptions').upsert({
+          tenant_id: customerRow.tenant_id,
+          stripe_subscription_id: subId,
+          stripe_customer_id: customerId,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   const subEvents = new Set([
     'customer.subscription.created',
     'customer.subscription.updated',
