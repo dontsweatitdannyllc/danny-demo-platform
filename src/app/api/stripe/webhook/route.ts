@@ -25,12 +25,18 @@ export async function POST(req: Request) {
 
   const sb = supabaseAdmin();
 
+  console.log('[stripe-webhook]', event.type);
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const tenantId = session.metadata?.tenant_id;
     const customerId = session.customer as string;
+    console.log('[stripe-webhook] checkout.session.completed', { tenantId, customerId });
     if (tenantId && customerId) {
-      await sb.from('stripe_customers').upsert({ tenant_id: tenantId, stripe_customer_id: customerId });
+      await sb.from('stripe_customers').upsert(
+        { tenant_id: tenantId, stripe_customer_id: customerId },
+        { onConflict: 'stripe_customer_id' },
+      );
     }
   }
 
@@ -69,6 +75,7 @@ export async function POST(req: Request) {
   if (subEvents.has(event.type)) {
     const sub = event.data.object as Stripe.Subscription;
     const priceId = sub.items.data[0]?.price?.id ?? null;
+    console.log('[stripe-webhook]', event.type, { subId: sub.id, status: sub.status, customer: sub.customer });
 
     const { data: customerRow } = await sb
       .from('stripe_customers')
@@ -77,18 +84,41 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (customerRow?.tenant_id) {
-      await sb.from('subscriptions').upsert({
-        tenant_id: customerRow.tenant_id,
-        stripe_subscription_id: sub.id,
-        stripe_customer_id: sub.customer as string,
-        status: sub.status,
-        current_period_end: sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
-          : null,
-        cancel_at_period_end: sub.cancel_at_period_end ?? false,
-        price_id: priceId,
-        updated_at: new Date().toISOString(),
-      });
+      const { error: upsertErr } = await sb.from('subscriptions').upsert(
+        {
+          tenant_id: customerRow.tenant_id,
+          stripe_subscription_id: sub.id,
+          stripe_customer_id: sub.customer as string,
+          status: sub.status,
+          current_period_end: sub.current_period_end
+            ? new Date(sub.current_period_end * 1000).toISOString()
+            : null,
+          cancel_at_period_end: sub.cancel_at_period_end ?? false,
+          price_id: priceId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'stripe_subscription_id' },
+      );
+      if (upsertErr) console.error('[stripe-webhook] upsert error', upsertErr);
+      else console.log('[stripe-webhook] upsert ok', { tenant: customerRow.tenant_id, status: sub.status });
+    } else {
+      console.warn('[stripe-webhook] no stripe_customers row for', sub.customer);
+    }
+  }
+
+  if (event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subId = invoice.subscription as string | null;
+    const customerId = invoice.customer as string;
+    console.log('[stripe-webhook]', event.type, { subId, customerId });
+
+    if (subId) {
+      const { error: updateErr } = await sb
+        .from('subscriptions')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('stripe_subscription_id', subId);
+      if (updateErr) console.error('[stripe-webhook] invoice update error', updateErr);
+      else console.log('[stripe-webhook] invoice → set active for sub', subId);
     }
   }
 
