@@ -41,6 +41,39 @@ export async function POST(req: Request) {
       );
       if (custErr) console.error('[stripe-webhook] stripe_customers upsert error', custErr);
     }
+
+    // checkout.session.completed with a subscription means payment succeeded.
+    // Fetch the live subscription from Stripe and activate it directly,
+    // so we don't depend on customer.subscription.updated arriving later.
+    const subId = session.subscription;
+    const resolvedSubId = typeof subId === 'string' ? subId : subId?.id;
+    if (resolvedSubId && tenantId) {
+      try {
+        const liveSub = await stripe.subscriptions.retrieve(resolvedSubId);
+        const priceId = liveSub.items.data[0]?.price?.id ?? null;
+        const status = liveSub.status === 'incomplete' ? 'active' : liveSub.status;
+        console.log('[stripe-webhook] checkout → activating sub', { resolvedSubId, stripeStatus: liveSub.status, writingStatus: status });
+        const { error: subErr } = await sb.from('subscriptions').upsert(
+          {
+            tenant_id: tenantId,
+            stripe_subscription_id: resolvedSubId,
+            stripe_customer_id: customerId,
+            status,
+            current_period_end: liveSub.current_period_end
+              ? new Date(liveSub.current_period_end * 1000).toISOString()
+              : null,
+            cancel_at_period_end: liveSub.cancel_at_period_end ?? false,
+            price_id: priceId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'stripe_subscription_id' },
+        );
+        if (subErr) console.error('[stripe-webhook] checkout sub upsert error', subErr);
+        else console.log('[stripe-webhook] checkout → sub activated', { tenantId, status });
+      } catch (e: any) {
+        console.error('[stripe-webhook] checkout → failed to retrieve sub', e.message);
+      }
+    }
   }
 
   const subEvents = new Set([
@@ -61,6 +94,21 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (customerRow?.tenant_id) {
+      // Don't let a stale 'incomplete' event overwrite an already-active subscription.
+      // This prevents the race where customer.subscription.created (incomplete) arrives
+      // after checkout.session.completed already set the row to active.
+      if (sub.status === 'incomplete') {
+        const { data: existing } = await sb
+          .from('subscriptions')
+          .select('status')
+          .eq('stripe_subscription_id', sub.id)
+          .maybeSingle();
+        if (existing?.status === 'active') {
+          console.log('[stripe-webhook] skipping downgrade from active → incomplete', sub.id);
+          return NextResponse.json({ received: true });
+        }
+      }
+
       const { error: upsertErr } = await sb.from('subscriptions').upsert(
         {
           tenant_id: customerRow.tenant_id,
