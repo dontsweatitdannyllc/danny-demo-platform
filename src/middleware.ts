@@ -12,10 +12,13 @@ export function middleware(req: NextRequest) {
 
   console.log('[middleware]', { host, domain, pathname: url.pathname, match: host.endsWith(`.${domain}`) });
 
+  // Routes that live at the top level and should never be tenant-rewritten.
+  const skipRewrite = ['/success'];
+
   // tenant.domain
   if (host.endsWith(`.${domain}`)) {
     const tenant = host.replace(`.${domain}`, '');
-    if (tenant && tenant !== 'www') {
+    if (tenant && tenant !== 'www' && !skipRewrite.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'))) {
       // If already rewritten, don't double-prefix
       if (!url.pathname.startsWith(`/t/${tenant}`)) {
         url.pathname = `/t/${tenant}${url.pathname}`;
