@@ -31,6 +31,9 @@ export function GateAndRender({ tenant, r2Url }: { tenant: string; r2Url: string
   const monthly = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY;
   const yearly = process.env.NEXT_PUBLIC_STRIPE_PRICE_YEARLY;
 
+  // Helpful debug: shows whether the client actually received the env vars.
+  const showDebug = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').has('debug');
+
   const returnUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
     return window.location.href.split('?')[0];
@@ -53,6 +56,11 @@ export function GateAndRender({ tenant, r2Url }: { tenant: string; r2Url: string
       <div style={{ padding: 24, border: '1px solid #ddd', borderRadius: 12, maxWidth: 720 }}>
         <h2>Unlock this demo</h2>
         <p>You’ve used your free preview views. Subscribe to unlock full access.</p>
+        {showDebug ? (
+          <pre style={{ marginTop: 12, padding: 12, background: '#f8fafc', borderRadius: 10, overflowX: 'auto' }}>
+            {JSON.stringify({ monthly, yearly }, null, 2)}
+          </pre>
+        ) : null}
         <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
           <button disabled={!monthly} onClick={() => monthly && checkout(monthly)}>
             $20 / month
