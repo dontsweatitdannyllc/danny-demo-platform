@@ -33,36 +33,13 @@ export async function POST(req: Request) {
     const customerId = session.customer as string;
     console.log('[stripe-webhook] checkout.session.completed', { tenantId, customerId });
     if (tenantId && customerId) {
-      await sb.from('stripe_customers').upsert(
+      // tenant_id has a unique constraint — use it for conflict so retries
+      // with a new Stripe customer update the row instead of failing.
+      const { error: custErr } = await sb.from('stripe_customers').upsert(
         { tenant_id: tenantId, stripe_customer_id: customerId },
-        { onConflict: 'stripe_customer_id' },
+        { onConflict: 'tenant_id' },
       );
-    }
-  }
-
-  // Mark subscription paid/active on invoice.paid (best signal that money actually moved)
-  if (event.type === 'invoice.paid') {
-    const inv = event.data.object as Stripe.Invoice;
-    const subId = typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id;
-    const customerId = typeof inv.customer === 'string' ? inv.customer : inv.customer?.id;
-
-    if (subId && customerId) {
-      // Find tenant via stripe_customers
-      const { data: customerRow } = await sb
-        .from('stripe_customers')
-        .select('tenant_id')
-        .eq('stripe_customer_id', customerId)
-        .maybeSingle();
-
-      if (customerRow?.tenant_id) {
-        await sb.from('subscriptions').upsert({
-          tenant_id: customerRow.tenant_id,
-          stripe_subscription_id: subId,
-          stripe_customer_id: customerId,
-          status: 'active',
-          updated_at: new Date().toISOString(),
-        });
-      }
+      if (custErr) console.error('[stripe-webhook] stripe_customers upsert error', custErr);
     }
   }
 
@@ -108,9 +85,16 @@ export async function POST(req: Request) {
 
   if (event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice;
-    const subId = invoice.subscription as string | null;
-    const customerId = invoice.customer as string;
-    console.log('[stripe-webhook]', event.type, { subId, customerId });
+    // Stripe API versions vary — subscription may be a string, object, or missing.
+    // Fall back to the first line item's subscription field.
+    const raw = (invoice as any).subscription;
+    const subId: string | null =
+      (typeof raw === 'string' ? raw : raw?.id) ||
+      (invoice.lines?.data?.[0] as any)?.subscription ||
+      null;
+    const rawCust = (invoice as any).customer;
+    const customerId: string | null = typeof rawCust === 'string' ? rawCust : rawCust?.id || null;
+    console.log('[stripe-webhook]', event.type, { subId, customerId, rawSubType: typeof raw, rawSub: raw });
 
     if (subId) {
       const { error: updateErr } = await sb
