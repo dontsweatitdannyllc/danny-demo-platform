@@ -28,6 +28,9 @@ MVP paywalled demo platform:
 - `PAYWALL_FREE_VIEWS=2`
 - `PAYWALL_COOLDOWN_HOURS=24`
 
+**Admin (optional):**
+- `ADMIN_SECRET=...` (protects `/api/admin/create-demo`)
+
 3) Seed a demo:
 - Insert into `tenants` (slug = subdomain)
 - Insert into `content_items` with `slug='main'` and `r2_url='https://cdn.../<tenant>/index.html'`
