@@ -22,11 +22,15 @@ export async function POST(req: NextRequest) {
     if (tErr) return NextResponse.json({ error: 'tenant not found' }, { status: 404 });
 
     const stripe = stripeClient();
+    const platformOrigin = process.env.NEXT_PUBLIC_PLATFORM_ORIGIN || 'https://platform.dontsweatitdanny.com';
+    const success_url = `${platformOrigin}/success?tenant=${encodeURIComponent(tenantRow.slug)}&return=${encodeURIComponent(returnUrl)}`;
+    const cancel_url = `${returnUrl}?canceled=1`;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${returnUrl}?success=1`,
-      cancel_url: `${returnUrl}?canceled=1`,
+      success_url,
+      cancel_url,
       metadata: { tenant_id: tenantRow.id, tenant_slug: tenantRow.slug },
     });
 
