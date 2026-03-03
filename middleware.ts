@@ -10,6 +10,8 @@ export function middleware(req: NextRequest) {
   const domain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'dontsweatitdanny.com';
   const url = req.nextUrl;
 
+  console.log('[middleware]', { host, domain, pathname: url.pathname, match: host.endsWith(`.${domain}`) });
+
   // tenant.domain
   if (host.endsWith(`.${domain}`)) {
     const tenant = host.replace(`.${domain}`, '');
