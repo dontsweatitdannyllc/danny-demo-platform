@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { gateConfig } from '@/lib/gate';
+// gate config is inline in this route (time-based free preview)
 
 export async function POST(req: NextRequest) {
   const { tenant } = await req.json();
@@ -29,8 +29,10 @@ export async function POST(req: NextRequest) {
 
   if ((subs?.length || 0) > 0) return res;
 
-  const { FREE_VIEWS, cooldownMs } = gateConfig();
+  // Time-based free preview: once a viewer starts a preview, they get N hours access.
   const now = new Date();
+  const FREE_PREVIEW_HOURS = parseInt(process.env.PAYWALL_FREE_PREVIEW_HOURS || '24', 10);
+  const freePreviewMs = FREE_PREVIEW_HOURS * 60 * 60 * 1000;
 
   const { data: access } = await sb
     .from('viewer_access')
@@ -39,6 +41,7 @@ export async function POST(req: NextRequest) {
     .eq('viewer_id', viewerId)
     .maybeSingle();
 
+  // If no access row, start the preview window now.
   if (!access) {
     await sb.from('viewer_access').insert({
       tenant_id: tenantRow.id,
@@ -47,22 +50,19 @@ export async function POST(req: NextRequest) {
       first_view_at: now.toISOString(),
       last_view_at: now.toISOString(),
     });
-    res.headers.set('x-gate', 'new');
-    return NextResponse.json({ allowed: true, remaining: FREE_VIEWS - 1 }, { headers: res.headers });
+    return NextResponse.json({ allowed: true, remaining: 1 }, { headers: res.headers });
   }
 
-  const last = access.last_view_at ? new Date(access.last_view_at) : null;
-  const cooledDown = !last || now.getTime() - last.getTime() > cooldownMs;
-  let views = access.views ?? 0;
-  if (cooledDown) views = 0;
+  const first = access.first_view_at ? new Date(access.first_view_at) : null;
+  const startedAt = first || now;
+  const stillInWindow = now.getTime() - startedAt.getTime() < freePreviewMs;
 
-  if (views < FREE_VIEWS) {
-    const nextViews = views + 1;
+  if (stillInWindow) {
     await sb
       .from('viewer_access')
-      .update({ views: nextViews, last_view_at: now.toISOString(), updated_at: now.toISOString() })
+      .update({ last_view_at: now.toISOString(), updated_at: now.toISOString() })
       .eq('id', access.id);
-    return NextResponse.json({ allowed: true, remaining: Math.max(0, FREE_VIEWS - nextViews) }, { headers: res.headers });
+    return NextResponse.json({ allowed: true, remaining: 1 }, { headers: res.headers });
   }
 
   return NextResponse.json({ allowed: false, remaining: 0 }, { headers: res.headers });
