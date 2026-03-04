@@ -32,6 +32,29 @@ async function vercelFetch(path: string, init: RequestInit = {}) {
   return json;
 }
 
+async function ensureProject({ projectName, githubOwner, githubRepo }: { projectName: string; githubOwner: string; githubRepo: string }) {
+  // 1) Does it exist?
+  try {
+    return await vercelFetch(`/v9/projects/${encodeURIComponent(projectName)}`);
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    if (!msg.includes(' 404 ')) throw e;
+  }
+
+  // 2) Create it (personal account; no teamId)
+  return vercelFetch('/v9/projects', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: projectName,
+      framework: 'nextjs',
+      gitRepository: {
+        type: 'github',
+        repo: `${githubOwner}/${githubRepo}`,
+      },
+    }),
+  });
+}
+
 async function ensureAlias({ projectName, alias }: { projectName: string; alias: string }) {
   // Create alias pointing at project.
   // Docs: POST /v2/aliases
@@ -51,9 +74,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const slug = String(body.slug || '').trim().toLowerCase();
   const name = String(body.name || '').trim();
+  const githubOwner = String(body.github_owner || '').trim();
+  const githubRepo = String(body.github_repo || '').trim();
 
-  if (!slug || !name) {
-    return NextResponse.json({ error: 'slug and name required' }, { status: 400 });
+  if (!slug || !name || !githubOwner || !githubRepo) {
+    return NextResponse.json({ error: 'slug, name, github_owner, github_repo required' }, { status: 400 });
   }
 
   const domain = requireEnv('DEMO_WILDCARD_DOMAIN'); // e.g. demos.dontsweatitdanny.com
@@ -61,7 +86,10 @@ export async function POST(req: NextRequest) {
   const alias = `${slug}.${domain}`;
   const siteUrl = `https://${alias}`;
 
-  // 1) Ensure alias exists in Vercel
+  // 1) Ensure Vercel project exists and is linked to the GitHub repo
+  await ensureProject({ projectName, githubOwner, githubRepo });
+
+  // 2) Ensure alias exists in Vercel
   try {
     await ensureAlias({ projectName, alias });
   } catch (e: any) {
