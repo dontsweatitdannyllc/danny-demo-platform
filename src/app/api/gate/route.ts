@@ -4,9 +4,21 @@ import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 // gate config is inline in this route (time-based free preview)
 
+export async function OPTIONS() {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', 'https://demos.dontsweatitdanny.com');
+  res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'content-type');
+  res.headers.set('Access-Control-Allow-Credentials', 'true');
+  return res;
+}
+
 export async function POST(req: NextRequest) {
   const { tenant } = await req.json();
   if (!tenant) return NextResponse.json({ error: 'tenant required' }, { status: 400 });
+
+  const origin = req.headers.get('origin') || '';
+  const allowOrigin = origin === 'https://demos.dontsweatitdanny.com' ? origin : '';
 
   const sb = supabaseAdmin();
   const jar = await cookies();
@@ -25,6 +37,11 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   const res = NextResponse.json({ allowed: true, remaining: 0, reason: 'subscribed', expiresAt: null });
+  if (allowOrigin) {
+    res.headers.set('Access-Control-Allow-Origin', allowOrigin);
+    res.headers.set('Access-Control-Allow-Credentials', 'true');
+    res.headers.set('Vary', 'Origin');
+  }
   res.cookies.set('vw', viewerId, { httpOnly: true, sameSite: 'lax', path: '/' });
 
   if ((subs?.length || 0) > 0) return res;
@@ -67,5 +84,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ allowed: true, remaining: 1, expiresAt }, { headers: res.headers });
   }
 
-  return NextResponse.json({ allowed: false, remaining: 0 }, { headers: res.headers });
+  const deny = NextResponse.json({ allowed: false, remaining: 0 }, { headers: res.headers });
+  if (allowOrigin) {
+    deny.headers.set('Access-Control-Allow-Origin', allowOrigin);
+    deny.headers.set('Access-Control-Allow-Credentials', 'true');
+    deny.headers.set('Vary', 'Origin');
+  }
+  return deny;
 }
