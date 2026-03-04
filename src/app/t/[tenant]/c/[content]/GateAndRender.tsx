@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Paywall } from './Paywall';
 
-type GateResult = { allowed: boolean; remaining?: number };
+type GateResult = { allowed: boolean; remaining?: number; expiresAt?: string | null };
 
 export function GateAndRender({ tenant, r2Url, siteUrl }: { tenant: string; r2Url: string; siteUrl: string }) {
-  const [state, setState] = useState<{ loading: boolean; allowed: boolean; remaining: number }>({
+  const [state, setState] = useState<{ loading: boolean; allowed: boolean; remaining: number; expiresAt: string | null }>({
     loading: true,
     allowed: false,
     remaining: 0,
+    expiresAt: null,
   });
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export function GateAndRender({ tenant, r2Url, siteUrl }: { tenant: string; r2Ur
       });
       const json = (await res.json()) as GateResult;
       if (cancelled) return;
-      setState({ loading: false, allowed: !!json.allowed, remaining: json.remaining ?? 0 });
+      setState({ loading: false, allowed: !!json.allowed, remaining: json.remaining ?? 0, expiresAt: (json.expiresAt ?? null) as any });
     })();
     return () => {
       cancelled = true;
@@ -66,6 +67,7 @@ export function GateAndRender({ tenant, r2Url, siteUrl }: { tenant: string; r2Ur
           yearlyEnabled={!!yearly}
           onMonthly={() => monthly && checkout(monthly)}
           onYearly={() => yearly && checkout(yearly)}
+          expiresAt={state.expiresAt}
         />
       </div>
     );

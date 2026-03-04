@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     .in('status', ['active', 'trialing'])
     .limit(1);
 
-  const res = NextResponse.json({ allowed: true, remaining: 0, reason: 'subscribed' });
+  const res = NextResponse.json({ allowed: true, remaining: 0, reason: 'subscribed', expiresAt: null });
   res.cookies.set('vw', viewerId, { httpOnly: true, sameSite: 'lax', path: '/' });
 
   if ((subs?.length || 0) > 0) return res;
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
       first_view_at: now.toISOString(),
       last_view_at: now.toISOString(),
     });
-    return NextResponse.json({ allowed: true, remaining: 1 }, { headers: res.headers });
+    const expiresAt = new Date(now.getTime() + freePreviewMs).toISOString();
+    return NextResponse.json({ allowed: true, remaining: 1, expiresAt }, { headers: res.headers });
   }
 
   const first = access.first_view_at ? new Date(access.first_view_at) : null;
@@ -62,7 +63,8 @@ export async function POST(req: NextRequest) {
       .from('viewer_access')
       .update({ last_view_at: now.toISOString(), updated_at: now.toISOString() })
       .eq('id', access.id);
-    return NextResponse.json({ allowed: true, remaining: 1 }, { headers: res.headers });
+    const expiresAt = new Date(startedAt.getTime() + freePreviewMs).toISOString();
+    return NextResponse.json({ allowed: true, remaining: 1, expiresAt }, { headers: res.headers });
   }
 
   return NextResponse.json({ allowed: false, remaining: 0 }, { headers: res.headers });

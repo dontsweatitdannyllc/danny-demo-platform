@@ -1,19 +1,51 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+
+function formatMs(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  return `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+}
+
+function Countdown({ expiresAt }: { expiresAt: string }) {
+  const expiresMs = useMemo(() => new Date(expiresAt).getTime(), [expiresAt]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const remaining = expiresMs - now;
+  return <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{formatMs(remaining)}</span>;
+}
+
 export function Paywall({
   onMonthly,
   onYearly,
   monthlyEnabled,
   yearlyEnabled,
+  expiresAt,
 }: {
   onMonthly: () => void;
   onYearly: () => void;
   monthlyEnabled: boolean;
   yearlyEnabled: boolean;
+  expiresAt?: string | null;
 }) {
   return (
     <div style={{ padding: 24, border: '1px solid #e5e7eb', borderRadius: 16, maxWidth: 820 }}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>Private preview</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>Private preview</div>
+        {expiresAt ? (
+          <div style={{ fontSize: 12, color: '#b91c1c' }}>
+            Preview expires in <Countdown expiresAt={expiresAt} />
+          </div>
+        ) : null}
+      </div>
       <h2 style={{ margin: '0 0 10px' }}>Claim the website we built for your business</h2>
       <p style={{ margin: 0, color: '#4b5563', lineHeight: 1.5 }}>
         This demo was generated specifically for you. Subscribe to unlock it and keep it live.
