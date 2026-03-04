@@ -12,7 +12,7 @@ async function getContent(tenantSlug: string, contentSlug: string) {
 
   const { data: item, error: cErr } = await sb
     .from('content_items')
-    .select('slug,title,r2_url')
+    .select('slug,title,r2_url,site_url')
     .eq('tenant_id', tenant.id)
     .eq('slug', contentSlug)
     .single();
@@ -32,7 +32,7 @@ export default async function Page({
   return (
     <main style={{ padding: 16 }}>
       <h1 style={{ margin: '8px 0 12px' }}>{item.title}</h1>
-      <GateAndRender tenant={tenant} r2Url={item.r2_url} />
+      <GateAndRender tenant={tenant} r2Url={item.r2_url || ''} siteUrl={item.site_url || ''} />
     </main>
   );
 }

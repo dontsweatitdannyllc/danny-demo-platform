@@ -6,7 +6,7 @@ import { Paywall } from './Paywall';
 
 type GateResult = { allowed: boolean; remaining?: number };
 
-export function GateAndRender({ tenant, r2Url }: { tenant: string; r2Url: string }) {
+export function GateAndRender({ tenant, r2Url, siteUrl }: { tenant: string; r2Url: string; siteUrl: string }) {
   const [state, setState] = useState<{ loading: boolean; allowed: boolean; remaining: number }>({
     loading: true,
     allowed: false,
@@ -71,6 +71,15 @@ export function GateAndRender({ tenant, r2Url }: { tenant: string; r2Url: string
     );
   }
 
+  // Clean long-term: redirect to the hosted site (no iframe).
+  if (siteUrl) {
+    if (typeof window !== 'undefined') {
+      window.location.href = siteUrl;
+    }
+    return <p>Redirecting…</p>;
+  }
+
+  // Legacy fallback: iframe R2/static URL
   return (
     <div>
       {state.remaining > 0 ? (
