@@ -65,11 +65,12 @@ async function ensureAlias({ projectName, alias }: { projectName: string; alias:
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-admin-secret') || '';
-  const expected = process.env.ADMIN_SECRET || '';
-  if (!expected || secret !== expected) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
+  try {
+    const secret = req.headers.get('x-admin-secret') || '';
+    const expected = process.env.ADMIN_SECRET || '';
+    if (!expected || secret !== expected) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
 
   const body = await req.json();
   const slug = String(body.slug || '').trim().toLowerCase();
@@ -126,13 +127,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'content_upsert_failed', details: cErr?.message }, { status: 500 });
   }
 
-  return NextResponse.json({
-    ok: true,
-    slug,
-    alias,
-    site_url: siteUrl,
-    paywall_url: `https://${slug}.${process.env.NEXT_PUBLIC_APP_DOMAIN || 'dontsweatitdanny.com'}/c/main`,
-    tenant,
-    content: contentRows[0],
-  });
+    return NextResponse.json({
+      ok: true,
+      slug,
+      alias,
+      site_url: siteUrl,
+      paywall_url: `https://${slug}.${process.env.NEXT_PUBLIC_APP_DOMAIN || 'dontsweatitdanny.com'}/c/main`,
+      tenant,
+      content: contentRows[0],
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      {
+        error: 'publish_demo_failed',
+        message: String(e?.message || e),
+      },
+      { status: 500 },
+    );
+  }
 }
