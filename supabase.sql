@@ -58,3 +58,18 @@ create table if not exists public.viewer_access (
 
 create index if not exists viewer_access_tenant_viewer_idx
   on public.viewer_access (tenant_id, viewer_id);
+
+-- Track v0 generations so webgen can reuse projects/chats without burning credits
+create table if not exists public.demo_generations (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  v0_project_id text,
+  v0_chat_id text,
+  v0_version_id text,
+  prompt_hash text,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists demo_generations_slug_idx
+  on public.demo_generations (slug);
