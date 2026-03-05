@@ -57,11 +57,23 @@ async function ensureProject({ projectName, githubOwner, githubRepo }: { project
 
 async function ensureAlias({ projectName, alias }: { projectName: string; alias: string }) {
   // Create alias pointing at project.
-  // Docs: POST /v2/aliases
-  return vercelFetch('/v2/aliases', {
-    method: 'POST',
-    body: JSON.stringify({ alias, project: projectName }),
-  });
+  // Vercel API: POST /v2/aliases
+  // Some tokens/scopes return 404 on /v2/aliases; fallback to /v9/projects/:project/domains
+  try {
+    return await vercelFetch('/v2/aliases', {
+      method: 'POST',
+      body: JSON.stringify({ alias, project: projectName }),
+    });
+  } catch (e: any) {
+    const msg = String(e?.message || e);
+    if (!msg.includes(' 404 ') || !msg.includes('/v2/aliases')) throw e;
+
+    // Fallback: add as a project domain
+    return vercelFetch(`/v9/projects/${encodeURIComponent(projectName)}/domains`, {
+      method: 'POST',
+      body: JSON.stringify({ name: alias }),
+    });
+  }
 }
 
 export async function POST(req: NextRequest) {
