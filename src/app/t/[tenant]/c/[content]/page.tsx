@@ -1,5 +1,8 @@
+import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { GateAndRender } from './GateAndRender';
+
+export const dynamic = 'force-dynamic';
 
 async function getContent(tenantSlug: string, contentSlug: string) {
   const sb = supabaseAdmin();
@@ -8,15 +11,23 @@ async function getContent(tenantSlug: string, contentSlug: string) {
     .select('id,slug,name')
     .eq('slug', tenantSlug)
     .single();
-  if (tErr) throw tErr;
+
+  if (tErr || !tenant) {
+    console.error('[content-page] tenant not found:', tenantSlug, tErr?.message);
+    return null;
+  }
 
   const { data: item, error: cErr } = await sb
     .from('content_items')
-    .select('slug,title,r2_url,site_url')
+    .select('slug,title,site_url')
     .eq('tenant_id', tenant.id)
     .eq('slug', contentSlug)
     .single();
-  if (cErr) throw cErr;
+
+  if (cErr || !item) {
+    console.error('[content-page] content not found:', contentSlug, 'for tenant:', tenantSlug, cErr?.message);
+    return null;
+  }
 
   return { tenant, item };
 }
@@ -27,12 +38,15 @@ export default async function Page({
   params: Promise<{ tenant: string; content: string }>;
 }) {
   const { tenant, content } = await params;
-  const { item } = await getContent(tenant, content);
+  const result = await getContent(tenant, content);
+  if (!result) return notFound();
+
+  const { item } = result;
 
   return (
     <main style={{ padding: 16 }}>
       <h1 style={{ margin: '8px 0 12px' }}>{item.title}</h1>
-      <GateAndRender tenant={tenant} r2Url={item.r2_url || ''} siteUrl={item.site_url || ''} />
+      <GateAndRender tenant={tenant} siteUrl={item.site_url || ''} />
     </main>
   );
 }

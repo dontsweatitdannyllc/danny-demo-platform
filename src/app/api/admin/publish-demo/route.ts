@@ -130,10 +130,10 @@ export async function POST(req: NextRequest) {
   const { data: contentRows, error: cErr } = await sb
     .from('content_items')
     .upsert(
-      { tenant_id: tenant.id, slug: 'main', title: `${tenant.name} — Demo`, site_url: siteUrl, r2_url: null },
+      { tenant_id: tenant.id, slug: 'main', title: `${tenant.name} — Demo`, site_url: siteUrl },
       { onConflict: 'tenant_id,slug' },
     )
-    .select('id,slug,title,r2_url,site_url');
+    .select('id,slug,title,site_url');
 
   if (cErr || !contentRows?.[0]) {
     return NextResponse.json({ error: 'content_upsert_failed', details: cErr?.message }, { status: 500 });

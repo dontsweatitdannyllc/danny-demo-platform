@@ -11,11 +11,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const slug = String(body.slug || '').trim().toLowerCase();
   const name = String(body.name || '').trim();
-  const r2_url = String(body.r2_url || '').trim();
   const site_url = String(body.site_url || '').trim();
 
-  if (!slug || !name || (!r2_url && !site_url)) {
-    return NextResponse.json({ error: 'slug, name, and (r2_url or site_url) required' }, { status: 400 });
+  if (!slug || !name || !site_url) {
+    return NextResponse.json({ error: 'slug, name, and site_url required' }, { status: 400 });
   }
 
   const sb = supabaseAdmin();
@@ -36,10 +35,10 @@ export async function POST(req: NextRequest) {
   const { data: contentRows, error: cErr } = await sb
     .from('content_items')
     .upsert(
-      { tenant_id: tenant.id, slug: 'main', title: `${tenant.name} — Demo`, r2_url: r2_url || null, site_url: site_url || null },
+      { tenant_id: tenant.id, slug: 'main', title: `${tenant.name} — Demo`, site_url },
       { onConflict: 'tenant_id,slug' },
     )
-    .select('id,slug,title,r2_url,site_url');
+    .select('id,slug,title,site_url');
 
   if (cErr || !contentRows?.[0]) {
     return NextResponse.json({ error: 'content_upsert_failed', details: cErr?.message }, { status: 500 });

@@ -13,10 +13,8 @@ create table if not exists public.content_items (
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   slug text not null,
   title text not null,
-  -- Legacy: originally used for static R2 HTML. We now also allow any URL.
-  r2_url text,
-  -- Preferred: where to send the user after the paywall (e.g. Vercel deployment URL)
-  site_url text,
+  -- Where to send the user after the paywall (e.g. Vercel deployment URL)
+  site_url text not null,
   created_at timestamptz not null default now(),
   unique (tenant_id, slug)
 );
