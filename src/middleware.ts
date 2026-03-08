@@ -15,15 +15,25 @@ export function middleware(req: NextRequest) {
   // Routes that live at the top level and should never be tenant-rewritten.
   const skipRewrite = ['/success'];
 
+  const platformOrigin = process.env.NEXT_PUBLIC_PLATFORM_ORIGIN || `https://platform.${domain}`;
+
   // tenant.domain
   if (host.endsWith(`.${domain}`)) {
     const tenant = host.replace(`.${domain}`, '');
-    if (tenant && tenant !== 'www' && !skipRewrite.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'))) {
-      // If already rewritten, don't double-prefix
-      if (!url.pathname.startsWith(`/t/${tenant}`)) {
-        url.pathname = `/t/${tenant}${url.pathname}`;
+    if (tenant && tenant !== 'www' && tenant !== 'platform') {
+      // Redirect /c/* on tenant subdomains to the canonical platform URL.
+      // e.g. hawthorne.dontsweatitdanny.com/c/main → platform.dontsweatitdanny.com/t/hawthorne/c/main
+      if (url.pathname.startsWith('/c/')) {
+        return NextResponse.redirect(`${platformOrigin}/t/${tenant}${url.pathname}`);
       }
-      return NextResponse.rewrite(url);
+
+      if (!skipRewrite.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'))) {
+        // If already rewritten, don't double-prefix
+        if (!url.pathname.startsWith(`/t/${tenant}`)) {
+          url.pathname = `/t/${tenant}${url.pathname}`;
+        }
+        return NextResponse.rewrite(url);
+      }
     }
   }
 
