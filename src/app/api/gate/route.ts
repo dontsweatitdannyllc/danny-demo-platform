@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       last_view_at: now.toISOString(),
     });
     const expiresAt = new Date(now.getTime() + freePreviewMs).toISOString();
-    return NextResponse.json({ allowed: true, remaining: 1, expiresAt }, { headers: res.headers });
+    return NextResponse.json({ allowed: true, remaining: 1, reason: 'preview', expiresAt }, { headers: res.headers });
   }
 
   const first = access.first_view_at ? new Date(access.first_view_at) : null;
@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
       .update({ last_view_at: now.toISOString(), updated_at: now.toISOString() })
       .eq('id', access.id);
     const expiresAt = new Date(startedAt.getTime() + freePreviewMs).toISOString();
-    return NextResponse.json({ allowed: true, remaining: 1, expiresAt }, { headers: res.headers });
+    return NextResponse.json({ allowed: true, remaining: 1, reason: 'preview', expiresAt }, { headers: res.headers });
   }
 
-  const deny = NextResponse.json({ allowed: false, remaining: 0 }, { headers: res.headers });
+  const deny = NextResponse.json({ allowed: false, remaining: 0, reason: 'expired' }, { headers: res.headers });
   if (allowOrigin) {
     deny.headers.set('Access-Control-Allow-Origin', allowOrigin);
     deny.headers.set('Access-Control-Allow-Credentials', 'true');
