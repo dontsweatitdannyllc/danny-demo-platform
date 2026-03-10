@@ -37,5 +37,14 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  
+
+  // Custom domain routing
+  if (!host.endsWith(`.${domain}`) && host !== 'localhost:3000') {
+    const url = req.nextUrl.clone()
+    url.pathname = `/api/domain/resolve?host=${host}`
+    return NextResponse.rewrite(url)
+  }
+
   return NextResponse.next();
 }

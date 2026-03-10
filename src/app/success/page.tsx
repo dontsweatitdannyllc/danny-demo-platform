@@ -22,7 +22,7 @@ export default function SuccessPage() {
           setState({ status: 'active' });
           // Give the UI a beat, then redirect back to the demo.
           setTimeout(() => {
-            if (returnUrl) window.location.href = returnUrl;
+            if (returnUrl) window.location.href = '/t/' + tenant + '/provision';
           }, 800);
         } else {
           setState({ status: 'waiting', message: 'Waiting for Stripe to confirm…' });
