@@ -5,6 +5,7 @@ import { useState } from 'react'
 export default function ProvisionPage({ params }: any) {
   const [domain, setDomain] = useState('')
   const [done, setDone] = useState(false)
+  const [verified,setVerified]=useState(false)
 
   const attachDomain = async () => {
     const slug = params.tenant
@@ -15,6 +16,9 @@ export default function ProvisionPage({ params }: any) {
       body: JSON.stringify({ slug, domain }),
     })
 
+    
+    const v=await fetch('/api/domain/verify?domain='+domain).then(r=>r.json())
+    setVerified(v.verified)
     setDone(true)
   }
 
@@ -22,7 +26,8 @@ export default function ProvisionPage({ params }: any) {
     return (
       <div style={{ padding: 40 }}>
         <h1>Domain attached</h1>
-        <p>Point your DNS to demos.dontsweatitdanny.com</p>
+        <p>Point your DNS CNAME to demos.dontsweatitdanny.com</p>
+        {verified ? <p style={{color:'green'}}>Domain verified ✅</p> : <p>DNS not detected yet. It may take a few minutes.</p>}
       </div>
     )
   }
