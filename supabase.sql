@@ -56,3 +56,12 @@ create table if not exists public.demo_generations (
 
 create index if not exists demo_generations_slug_idx
   on public.demo_generations (slug);
+
+alter table public.content_items
+add column if not exists claimed boolean default false;
+
+alter table public.content_items
+add column if not exists demo_mode boolean default true;
+
+alter table public.content_items
+add column if not exists custom_domain text;
