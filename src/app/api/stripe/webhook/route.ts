@@ -32,6 +32,17 @@ export async function POST(req: Request) {
     const tenantId = session.metadata?.tenant_id;
     const customerId = session.customer as string;
     console.log('[stripe-webhook] checkout.session.completed', { tenantId, customerId });
+
+    // If checkout metadata includes content_slug, mark demo as claimed
+    const contentSlug = session.metadata?.content_slug;
+    if (contentSlug) {
+      const { error: claimErr } = await sb
+        .from('content_items')
+        .update({ claimed: true, demo_mode: false })
+        .eq('slug', contentSlug);
+      if (claimErr) console.error('[stripe-webhook] claim update error', claimErr);
+      else console.log('[stripe-webhook] demo claimed', contentSlug);
+    }
     if (tenantId && customerId) {
       // tenant_id has a unique constraint — use it for conflict so retries
       // with a new Stripe customer update the row instead of failing.
