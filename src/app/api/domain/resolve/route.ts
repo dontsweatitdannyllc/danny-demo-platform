@@ -17,7 +17,6 @@ export async function GET(req: Request) {
 
   if (!data) return NextResponse.redirect('https://dontsweatitdanny.com')
 
-  return NextResponse.redirect(
-    `https://platform.dontsweatitdanny.com/t/${data.slug}`
-  )
+  const url = new URL(`/t/${data.slug}`, 'https://platform.dontsweatitdanny.com')
+  return NextResponse.rewrite(url)
 }
