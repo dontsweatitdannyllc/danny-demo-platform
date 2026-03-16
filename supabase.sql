@@ -65,3 +65,14 @@ add column if not exists demo_mode boolean default true;
 
 alter table public.content_items
 add column if not exists custom_domain text;
+
+-- Owner token for post-purchase editing (generated on claim)
+alter table public.content_items
+add column if not exists owner_token text;
+
+-- Editable site content (populated after owner saves edits)
+create table if not exists public.site_content (
+  slug text primary key,
+  content jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);

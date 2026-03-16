@@ -20,5 +20,18 @@ export async function GET(req: NextRequest) {
   if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
 
   const active = (subs?.length || 0) > 0;
-  return NextResponse.json({ tenant: tenantRow.slug, active, subscription: subs?.[0] || null });
+
+  // Include owner_token so the success page can link to the editor
+  let owner_token: string | null = null;
+  if (active) {
+    const { data: contentRow } = await sb
+      .from('content_items')
+      .select('owner_token')
+      .eq('slug', 'main')
+      .eq('tenant_id', tenantRow.id)
+      .maybeSingle();
+    owner_token = contentRow?.owner_token || null;
+  }
+
+  return NextResponse.json({ tenant: tenantRow.slug, active, subscription: subs?.[0] || null, owner_token });
 }

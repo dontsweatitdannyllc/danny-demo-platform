@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 import Stripe from 'stripe';
 import { stripeClient } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -36,12 +37,13 @@ export async function POST(req: Request) {
     // If checkout metadata includes content_slug, mark demo as claimed
     const contentSlug = session.metadata?.content_slug;
     if (contentSlug) {
+      const ownerToken = randomBytes(32).toString('hex');
       const { error: claimErr } = await sb
         .from('content_items')
-        .update({ claimed: true, demo_mode: false })
+        .update({ claimed: true, demo_mode: false, owner_token: ownerToken })
         .eq('slug', contentSlug);
       if (claimErr) console.error('[stripe-webhook] claim update error', claimErr);
-      else console.log('[stripe-webhook] demo claimed', contentSlug);
+      else console.log('[stripe-webhook] demo claimed', contentSlug, 'owner_token generated');
     }
     if (tenantId && customerId) {
       // tenant_id has a unique constraint — use it for conflict so retries

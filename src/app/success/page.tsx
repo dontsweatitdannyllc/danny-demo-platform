@@ -7,7 +7,7 @@ export default function SuccessPage() {
   const tenant = params.get('tenant') || '';
   const returnUrl = params.get('return') || '';
 
-  const [state, setState] = useState<{ status: 'checking' | 'active' | 'waiting' | 'error'; message?: string }>(
+  const [state, setState] = useState<{ status: 'checking' | 'active' | 'waiting' | 'error'; message?: string; ownerToken?: string }>(
     { status: 'checking' },
   );
 
@@ -19,8 +19,8 @@ export default function SuccessPage() {
         const json = await res.json();
         if (cancelled) return;
         if (json.active) {
-          setState({ status: 'active' });
-          // Give the UI a beat, then redirect back to the demo.
+          setState({ status: 'active', ownerToken: json.owner_token || '' });
+          // Give the UI a beat, then redirect to provisioning.
           setTimeout(() => {
             if (returnUrl) window.location.href = '/t/' + tenant + '/provision';
           }, 800);
@@ -54,7 +54,23 @@ export default function SuccessPage() {
       </p>
 
       {state.status === 'active' ? (
-        <p>Unlocked. Redirecting you back to the demo…</p>
+        <>
+          <p>Unlocked. Redirecting you back to the demo…</p>
+          {state.ownerToken && (
+            <p style={{ marginTop: 12 }}>
+              <a
+                href={`/t/${tenant}/edit?token=${state.ownerToken}`}
+                style={{ textDecoration: 'underline', color: '#2563eb' }}
+              >
+                Edit your website
+              </a>
+              {' — '}
+              <span style={{ fontSize: 13, color: '#6b7280' }}>
+                Bookmark this link to edit your site anytime.
+              </span>
+            </p>
+          )}
+        </>
       ) : state.status === 'waiting' ? (
         <p>{state.message}</p>
       ) : state.status === 'error' ? (
